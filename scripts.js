@@ -181,11 +181,19 @@ const updatePosition = () => {
           newPosition.x > document.body.offsetWidth - obj.r
         ) {
           obj.vector.x = -obj.vector.x;
+          if (newPosition.x < obj.r)
+            newPosition.x = obj.r
+          else 
+            newPosition.x = document.body.offsetWidth - obj.r;
         } else if (
           newPosition.y < obj.r ||
           newPosition.y > document.body.offsetHeight - obj.r
         ) {
           obj.vector.y = -obj.vector.y;
+          if (newPosition.y < obj.r)
+            newPosition.y = obj.r
+          else 
+            newPosition.y = document.body.offsetHeight - obj.r;
         }
 
         const collidedCircle = objects.find((o) => {
