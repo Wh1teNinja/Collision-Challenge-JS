@@ -37,7 +37,7 @@ const vectorLength = (vector) => {
 
 const normalizeVector = (vector) => {
   length = vectorLength(vector);
-  return {x: vector.x / length, y: vector.y / length};
+  return { x: vector.x / length, y: vector.y / length };
 };
 
 const scalarProduct = (vector1, vector2) => {
@@ -66,41 +66,66 @@ const findClosestCircle = (circle) => {
 
 const calculateNewCirclePosition = (circle, collidedCircle) => {
   // vector towards the point of contact with the circle
-  let pointOfContactVector = normalizeVector({x: collidedCircle.x - circle.x, y: collidedCircle.y - circle.y});
+  let pointOfContactVector = normalizeVector({
+    x: collidedCircle.x - circle.x,
+    y: collidedCircle.y - circle.y,
+  });
 
-  // we find an angle between the point of collision(vector that points towards it) 
+  // we find an angle between the point of collision(vector that points towards it)
   // and movement vector of the circle
-  let collisionAngle = Math.acos(scalarProduct(circle.vector, pointOfContactVector) / 1);
+  let collisionAngle = Math.acos(
+    scalarProduct(circle.vector, pointOfContactVector) / 1
+  );
 
-  let pointOfContactVector90CW = {x: pointOfContactVector.y, y: -pointOfContactVector.x}; 
-  let collisionAngle90CW = Math.acos(scalarProduct(circle.vector, pointOfContactVector90CW) / 1)
-  
+  let pointOfContactVector90CW = {
+    x: pointOfContactVector.y,
+    y: -pointOfContactVector.x,
+  };
+  let collisionAngle90CW = Math.acos(
+    scalarProduct(circle.vector, pointOfContactVector90CW) / 1
+  );
+
   // we find out if this ball was hit on front or from behind
   // if on front then it changes its movement direction
-  // if from behind then it just slightly changes direction 
+  // if from behind then it just slightly changes direction
   let rotationAngle;
   if (radiansToDegrees(collisionAngle) <= 90)
-    rotationAngle = degreesToRadians(180) - (collisionAngle * 2);
-  else
-    rotationAngle = (degreesToRadians(180) - collisionAngle) / 2;
+    rotationAngle = degreesToRadians(180) - collisionAngle * 2;
+  else rotationAngle = (degreesToRadians(180) - collisionAngle) / 2;
 
   if (radiansToDegrees(collisionAngle90CW) > 90) {
-    circle.vector = {x: circle.vector.x * Math.cos(rotationAngle) - circle.vector.y * Math.sin(rotationAngle),
-                     y: circle.vector.x * Math.sin(rotationAngle) + circle.vector.y * Math.cos(rotationAngle)}
+    circle.vector = {
+      x:
+        circle.vector.x * Math.cos(rotationAngle) -
+        circle.vector.y * Math.sin(rotationAngle),
+      y:
+        circle.vector.x * Math.sin(rotationAngle) +
+        circle.vector.y * Math.cos(rotationAngle),
+    };
   } else {
-    rotationAngle = degreesToRadians(180) - (collisionAngle * 2);
-    circle.vector = {x: circle.vector.x * Math.cos(rotationAngle) + circle.vector.y * Math.sin(rotationAngle),
-                     y: -circle.vector.x * Math.sin(rotationAngle) + circle.vector.y * Math.cos(rotationAngle)}
+    rotationAngle = degreesToRadians(180) - collisionAngle * 2;
+    circle.vector = {
+      x:
+        circle.vector.x * Math.cos(rotationAngle) +
+        circle.vector.y * Math.sin(rotationAngle),
+      y:
+        -circle.vector.x * Math.sin(rotationAngle) +
+        circle.vector.y * Math.cos(rotationAngle),
+    };
   }
 
-  let distanceBetweenCircles = pointsDistance({x: circle.x, y: circle.y}, 
-                                          {x: collidedCircle.x, y: collidedCircle.y});
+  let distanceBetweenCircles = pointsDistance(
+    { x: circle.x, y: circle.y },
+    { x: collidedCircle.x, y: collidedCircle.y }
+  );
   let overlappingDepth = circle.r + collidedCircle.r - distanceBetweenCircles;
-  let newPosition = { x: circle.x - (pointOfContactVector.x * overlappingDepth) + circle.vector.x, 
-                      y: circle.y - (pointOfContactVector.y * overlappingDepth) + circle.vector.y};
-                  
+  let newPosition = {
+    x: circle.x - pointOfContactVector.x * overlappingDepth + circle.vector.x,
+    y: circle.y - pointOfContactVector.y * overlappingDepth + circle.vector.y,
+  };
+
   return newPosition;
-}
+};
 
 // Draw all the objects
 const drawFrame = () => {
@@ -110,9 +135,8 @@ const drawFrame = () => {
   //ctx.fillStyle = `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`;
   ctx.fillStyle = `blue`;
   objects.forEach((obj) => {
-    switch(obj.type) {
+    switch (obj.type) {
       case "circle":
-
         // Draw circle
         ctx.strokeStyle = "black";
         ctx.lineWidth = 2;
@@ -124,7 +148,6 @@ const drawFrame = () => {
         break;
 
       case "rectangle":
-        
         // Draw rectangle
         ctx.beginPath();
         ctx.rect(obj.x, obj.y, obj.width, obj.height);
@@ -137,7 +160,7 @@ const drawFrame = () => {
 
   if (stats === true) {
     objects.forEach((obj) => {
-      switch(obj.type) {
+      switch (obj.type) {
         case "circle":
           // Draw circle's vector
           ctx.strokeStyle = "green";
@@ -162,9 +185,42 @@ const drawFrame = () => {
           }
           break;
         case "rectangle":
+          let circle, closestPoint, distance;
+          ({ circle, closestPoint, distance } = objects.reduce((prev, curr) => {
+            if (curr.type === "rectangle") return prev;
+
+            let closestPoint = {x: Math.max(obj.x, Math.min(curr.x, obj.x + obj.width)), 
+                                y: Math.max(obj.y, Math.min(curr.y, obj.y + obj.height))};
+            
+
+            let vectorToClosestPoint = {x: closestPoint.x - curr.x,
+                                        y: closestPoint.y - curr.y};
+
+            let distance = vectorLength(vectorToClosestPoint);
+
+            if (prev.distance < 0 || distance < prev.distance) {
+              return {circle: curr, closestPoint, distance}
+            }
+
+            return prev;
+
+          }, {circle: {}, closestPoint: {}, distance: -1}));
+
+          if (circle) {
+            ctx.strokeStyle = "red";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(circle.x, circle.y);
+            ctx.lineTo(
+              closestPoint.x,
+              closestPoint.y,
+            );
+            ctx.stroke();
+          }
+          
           break;
       }
-    })
+    });
   }
 };
 
@@ -181,40 +237,53 @@ const updatePosition = () => {
           newPosition.x > document.body.offsetWidth - obj.r
         ) {
           obj.vector.x = -obj.vector.x;
-          if (newPosition.x < obj.r)
-            newPosition.x = obj.r
-          else 
-            newPosition.x = document.body.offsetWidth - obj.r;
+          if (newPosition.x < obj.r) newPosition.x = obj.r;
+          else newPosition.x = document.body.offsetWidth - obj.r;
         } else if (
           newPosition.y < obj.r ||
           newPosition.y > document.body.offsetHeight - obj.r
         ) {
           obj.vector.y = -obj.vector.y;
-          if (newPosition.y < obj.r)
-            newPosition.y = obj.r
-          else 
-            newPosition.y = document.body.offsetHeight - obj.r;
+          if (newPosition.y < obj.r) newPosition.y = obj.r;
+          else newPosition.y = document.body.offsetHeight - obj.r;
         }
 
-        const collidedCircle = objects.find((o) => {
+        const collidedObj = objects.find((o) => {
           if (o === obj) return false;
 
-          if (
-            pointsDistance({ x: o.x, y: o.y }, { x: obj.x, y: obj.y }) <=
-            o.r + obj.r
-          )
-            return true;
+          if (o.type === "circle") {
+            if (
+              pointsDistance({ x: o.x, y: o.y }, { x: obj.x, y: obj.y }) <=
+              o.r + obj.r
+            )
+              return true;
+          } else if (o.type === "rectangle") {
+            let closestPoint = {x: Math.max(o.x, Math.min(obj.x, o.x + o.width)), 
+                                y: Math.max(o.y, Math.min(obj.y, o.y + o.height))}
+
+            return false;
+          }
         });
 
-        if (collidedCircle) {
-          newPosition = calculateNewCirclePosition(obj, collidedCircle);
+        if (collidedObj?.type === "circle") {
+          let collidedCircle = collidedObj;
 
-          newPositionCollidedCircle = calculateNewCirclePosition(collidedCircle, obj);
-          collidedCircle.x = newPositionCollidedCircle.x;
-          collidedCircle.y = newPositionCollidedCircle.y;
+          if (collidedCircle) {
+            newPosition = calculateNewCirclePosition(obj, collidedCircle);
+
+            newPositionCollidedCircle = calculateNewCirclePosition(
+              collidedCircle,
+              obj
+            );
+            collidedCircle.x = newPositionCollidedCircle.x;
+            collidedCircle.y = newPositionCollidedCircle.y;
+          }
+
+          break;
+        } else if (collidedObj?.type === "rectangle") {
+          let collidedRectangle = collidedObj;
+
         }
-
-        break;
       case "rectangle":
         break;
     }
