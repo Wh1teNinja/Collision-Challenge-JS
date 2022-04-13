@@ -31,14 +31,13 @@ const randomNormalizedVector = () => {
 };
 
 // Returns vector length
-// (usually this function called abs() e.g. in Unity, but I find it more clear)
-const vectorLength = (vector) => {
+const abs = (vector) => {
   return Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2));
 };
 
 // Returns normalized vector
 const normalizeVector = (vector) => {
-  length = vectorLength(vector);
+  length = abs(vector);
   return { x: vector.x / length, y: vector.y / length };
 };
 
@@ -105,7 +104,7 @@ const findClosestCircle = (obj) => {
         };
 
         // find the length of this vector
-        let distance = vectorLength(vectorToClosestPoint);
+        let distance = abs(vectorToClosestPoint);
 
         // compare the distance of the current candidate to the previous closest circle
         // save the closest one as the closest circle
