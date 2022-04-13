@@ -6,15 +6,13 @@ let stats = false;
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-const lineIntersection = () => {};
-
 // Converts radians to degrees
-function radiansToDegrees(radians) {
+const radiansToDegrees = (radians) => {
   return radians * (180 / Math.PI);
 }
 
 // Coverts degrees to radians
-function degreesToRadians(degrees) {
+const degreesToRadians = (degrees) => {
   return degrees / (180 / Math.PI);
 }
 
@@ -25,34 +23,53 @@ const pointsDistance = (point1, point2) => {
   );
 };
 
+// Generates random normalized vector
 const randomNormalizedVector = () => {
   let x = Math.random() * 2 - 1;
   let y = Math.sqrt(1 - Math.pow(x, 2)) * Math.sign(Math.random() - 0.5);
   return { x: x, y: y };
 };
 
+// Returns vector length
+// (usually this function called abs() e.g. in Unity, but I find it more clear)
 const vectorLength = (vector) => {
   return Math.sqrt(Math.pow(vector.x, 2) + Math.pow(vector.y, 2));
 };
 
+// Returns normalized vector
 const normalizeVector = (vector) => {
   length = vectorLength(vector);
   return { x: vector.x / length, y: vector.y / length };
 };
 
+// Returns scalar product of two vectors
 const scalarProduct = (vector1, vector2) => {
   return vector1.x * vector2.x + vector1.y * vector2.y;
 };
 
-const findClosestCircle = (obj) => {
-  let closestCircle, closestPoint, distance;
+// All the small functions end here
+//==================================================================================================
 
+// This function finds closest circle to the provided object,
+// this object can be both circle or rectangle
+const findClosestCircle = (obj) => {
+  let closestCircle = null, closestPoint = null, distance = -1;
+
+  //---------------------------< Obj is circle >-----------------------------
   if (obj.type === "circle") {
     let circle = obj;
-    if (objects.filter((obj) => obj.type === "circle").length === 1) return null;
+    // check if there are any other circles at all to look for 
+    if (objects.filter((obj) => obj.type === "circle").length === 1) 
+      return { closestCircle, closestPoint, distance };
 
+    // Go through all the objects and find the closest circle
     closestCircle = objects.reduce((closest, curr) => {
+      // check if current candidate is a circle and not the original circle that was passed to the function
       if (circle !== curr && curr.type === "circle") {
+        // compare distance between previous closest circle and the original circle
+        // to distance between candidate(current) circle and the original circle
+        // if the first distance is smaller then keep the closest circle as it is
+        // unless save the current candidate circle as the closest circle 
         if (
           !closest ||
           pointsDistance(
@@ -64,37 +81,52 @@ const findClosestCircle = (obj) => {
       }
       return closest;
     }, null);
+  //----------------------------------------------------------------------------
+  //---------------------------< Obj is rectangle >-----------------------------
   } else if (obj.type === "rectangle") {
     let rectangle = obj;
 
+    // Go through all the objects and find the closest circle
     ({ closestCircle, closestPoint, distance } = objects.reduce(
       (prev, curr) => {
+        // ignore all the rectangles
         if (curr.type === "rectangle") return prev;
 
+        // find the closest point
         let closestPoint = {
           x: Math.max(rectangle.x, Math.min(curr.x, rectangle.x + rectangle.width)),
           y: Math.max(rectangle.y, Math.min(curr.y, rectangle.y + rectangle.height)),
         };
 
+        // build vector to the closest point
         let vectorToClosestPoint = {
           x: closestPoint.x - curr.x,
           y: closestPoint.y - curr.y,
         };
 
+        // find the length of this vector
         let distance = vectorLength(vectorToClosestPoint);
 
+        // compare the distance of the current candidate to the previous closest circle
+        // save the closest one as the closest circle
         if (prev.distance < 0 || distance < prev.distance) {
           return { closestCircle: curr, closestPoint, distance };
         }
-
         return prev;
+
       },
-      { closestCircle: {}, closestPoint: {}, distance: -1 }
+      { closestCircle: null, closestPoint: null, distance: -1 }
     ));
   }
+  //----------------------------------------------------------------------------
+
   return { closestCircle, closestPoint, distance };
 };
 
+// Calculates new position of the circle using provided collided circle
+// @param circle - the circle that we want to calculate new position for
+// @param collidedCircle - circle that the other circle collided with
+// @return new position of the circle
 const calculateNewCirclePosition = (circle, collidedCircle) => {
   // vector towards the point of contact with the circle
   let pointOfContactVector = normalizeVector({
@@ -102,14 +134,17 @@ const calculateNewCirclePosition = (circle, collidedCircle) => {
     y: collidedCircle.y - circle.y,
   });
 
-  // we find an angle between the point of collision(vector that points towards it)
+  // find an angle between the point of collision(vector that points towards it)
   // and movement vector of the circle
   let collisionAngle = Math.acos(scalarProduct(circle.vector, pointOfContactVector));
 
+  // rotate pointOfContactVector 90 degrees clockwise to use it to identify if this
+  // vector is on the right or the left of the movement vector
   let pointOfContactVector90CW = {
     x: pointOfContactVector.y,
     y: -pointOfContactVector.x,
   };
+  // find its angle 
   let collisionAngle90CW = Math.acos(
     scalarProduct(circle.vector, pointOfContactVector90CW)
   );
@@ -122,6 +157,8 @@ const calculateNewCirclePosition = (circle, collidedCircle) => {
     rotationAngle = degreesToRadians(180) - collisionAngle * 2;
   else rotationAngle = (degreesToRadians(180) - collisionAngle) / 2;
 
+  // using rotated collision vector we find out from where was the circle hit
+  // and rotate the movement vector accordingly, either clockwise or counterclockwise
   if (radiansToDegrees(collisionAngle90CW) > 90) {
     circle.vector = {
       x:
@@ -142,11 +179,14 @@ const calculateNewCirclePosition = (circle, collidedCircle) => {
     };
   }
 
+  // find the distance between circles' centers
   let distanceBetweenCircles = pointsDistance(
     { x: circle.x, y: circle.y },
     { x: collidedCircle.x, y: collidedCircle.y }
   );
+  // find overlapping depth between circles to then push the circle out of the collided circle
   let overlappingDepth = circle.r + collidedCircle.r - distanceBetweenCircles;
+  // apply all the calculation to generate new position
   let newPosition = {
     x: circle.x - pointOfContactVector.x * overlappingDepth + circle.vector.x,
     y: circle.y - pointOfContactVector.y * overlappingDepth + circle.vector.y,
@@ -155,7 +195,7 @@ const calculateNewCirclePosition = (circle, collidedCircle) => {
   return newPosition;
 };
 
-// Draw all the objects
+// Draws all the objects
 const drawFrame = () => {
   if (pause) return;
 
@@ -233,6 +273,7 @@ const drawFrame = () => {
   }
 };
 
+// Updates position of all the objects(circles to be precise as they are the only one that move)
 const updatePosition = () => {
   if (pause) return;
 
@@ -296,6 +337,8 @@ const updatePosition = () => {
       let collidedCircle = collidedObj;
 
       if (collidedCircle) {
+        // all the collision of the circles is handled by the separate function as it is needed
+        // for both collided circles to get new updated position
         newPosition = calculateNewCirclePosition(obj, collidedCircle);
 
         newPositionCollidedCircle = calculateNewCirclePosition(collidedCircle, obj);
@@ -312,6 +355,7 @@ const updatePosition = () => {
         obj.y > collidedRectangle.y &&
         obj.y < collidedRectangle.y + collidedRectangle.height
       ) {
+        // find the closest point to the boundary of the rectangle
         let closestPointsCandidates = [
           { x: obj.x, y: collidedRectangle.y },
           { x: obj.x, y: collidedRectangle.y + collidedRectangle.height },
@@ -329,21 +373,23 @@ const updatePosition = () => {
           return prev;
         }, null);
 
+        // build vector to the point
         let vectorToClosestPoint = normalizeVector({
           x: closestPoint.x - obj.x,
           y: closestPoint.y - obj.y,
         });
 
+        // find how deep circle stuck inside the rectangle
         let overlappingDepth =
           obj.r + pointsDistance({ x: obj.x, y: obj.y }, closestPoint);
 
-        console.log(closestPoint, overlappingDepth);
-
+        // teleport the circle out of the rectangle
         newPosition = {
           x: obj.x + vectorToClosestPoint.x * overlappingDepth,
           y: obj.y + vectorToClosestPoint.y * overlappingDepth,
         };
       } else {
+        // find closest point to the rectangle(which is the collision point as well for this circle)
         let closestPoint = {
           x: Math.max(
             collidedRectangle.x,
@@ -355,23 +401,31 @@ const updatePosition = () => {
           ),
         };
 
+        // build vector to the collision point
         let vectorToClosestPoint = normalizeVector({
           x: closestPoint.x - obj.x,
           y: closestPoint.y - obj.y,
         });
 
+        // find angle between the movement vector and the collision point
         let collisionAngle = Math.acos(
           scalarProduct(obj.vector, vectorToClosestPoint)
         );
+
+        // rotate the vector to the collision point by 90 degrees clockwise to identify
+        // if the vector is on the left or right of the movement vector
         let vectorToClosestPoint90CW = {
           x: vectorToClosestPoint.y,
           y: -vectorToClosestPoint.x,
         };
 
+        // find the new angle between the rotated vector and the movement vector
         let collisionAngle90CW = Math.acos(
           scalarProduct(obj.vector, vectorToClosestPoint90CW) / 1
         );
 
+        // depending on the results rotate the movement vector clockwise by the rotationAngle
+        // or counterclockwise
         let rotationAngle = degreesToRadians(180) - collisionAngle * 2;
         if (radiansToDegrees(collisionAngle90CW) > 90) {
           obj.vector = {
@@ -393,9 +447,11 @@ const updatePosition = () => {
           };
         }
 
+        // find how deep the circle is inside the rectangle
         let overlappingDepth =
           obj.r - pointsDistance({ x: obj.x, y: obj.y }, closestPoint);
 
+        // generate new position after all calculations
         newPosition = {
           x: obj.x - vectorToClosestPoint.x * overlappingDepth + obj.vector.x,
           y: obj.y - vectorToClosestPoint.y * overlappingDepth + obj.vector.y,
@@ -403,6 +459,7 @@ const updatePosition = () => {
       }
     }
 
+    // return the object with the updated position
     return {
       type: obj.type,
       x: newPosition.x,
@@ -413,6 +470,7 @@ const updatePosition = () => {
   });
 };
 
+//=======================================< Window Onload >============================================
 window.onload = (e) => {
   // Cursor coordinates to track mouse position
   let cursorX = 0;
@@ -424,17 +482,23 @@ window.onload = (e) => {
   canvas.width = document.body.offsetWidth;
   canvas.height = document.body.offsetHeight;
 
+  // this variable help tracking the rectangle that is currently being drawn
   let drawnRect = {};
 
+  // draw frame every 40 ms
   setInterval(() => {
     drawFrame();
   }, 40);
 
+  // update position of all object every 25 ms
   setInterval(() => {
     updatePosition();
   }, 25);
+  // why these numbers? idk just because it is 25 fps
+  // and updatePosition() can be called a bit faster  
 
   window.addEventListener("mousemove", (e) => {
+    // track cursor
     spanCursorX.innerHTML = e.x;
     spanCursorY.innerHTML = e.y;
     cursorX = e.x;
@@ -446,6 +510,7 @@ window.onload = (e) => {
         return true;
       } else return false;
     });
+    // if there is one then update its width and height depending on where the cursor is
     if (drawnRect) {
       drawnRect.width = cursorX - drawnRect.x;
       drawnRect.height = cursorY - drawnRect.y;
@@ -455,6 +520,7 @@ window.onload = (e) => {
   window.addEventListener("keydown", (e) => {
     switch (e.code) {
       case "KeyC":
+        // create circle
         objects.push({
           type: "circle",
           x: cursorX,
@@ -464,6 +530,7 @@ window.onload = (e) => {
         });
         break;
       case "KeyS":
+        // start drawing rectangle
         if (!drawnRect) {
           objects.push({
             type: "rectangle",
@@ -474,6 +541,7 @@ window.onload = (e) => {
             vector: { x: 0, y: 0 },
             drawing: true,
           });
+          // save rectangle to the variable so other events can access it 
           drawnRect = objects.find((obj) => {
             if (obj.type === "rectangle" && obj.drawing) {
               return true;
@@ -482,9 +550,11 @@ window.onload = (e) => {
         }
         break;
       case "KeyT":
+        // turn statistics(vectors and closest obj line e.g.) on and off
         stats = !stats;
         break;
       case "KeyP":
+        // turn pause on and off
         pause = !pause;
       default:
         break;
@@ -493,12 +563,17 @@ window.onload = (e) => {
 
   window.addEventListener("keyup", (e) => {
     switch (e.code) {
+      // when the S key is released that means rectangle is not drawn anymore 
+      // and it changes its state
       case "KeyS":
         drawnRect = objects.find((obj) => {
           if (obj.type === "rectangle" && obj.drawing) {
             return true;
           } else return false;
         });
+        // also if height or width is negative switch x or y with negative width or height
+        // and make them positive to make (x, y) of rectangle be the left top corner of the rectangle
+        // and width and height to be positive instead of negative
         if (drawnRect.width < 0) {
           drawnRect.x = drawnRect.x + drawnRect.width;
           drawnRect.width = -drawnRect.width;
