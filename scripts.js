@@ -420,7 +420,7 @@ const updatePosition = () => {
 
         // find the new angle between the rotated vector and the movement vector
         let collisionAngle90CW = Math.acos(
-          scalarProduct(obj.vector, vectorToClosestPoint90CW) / 1
+          scalarProduct(obj.vector, vectorToClosestPoint90CW)
         );
 
         // depending on the results rotate the movement vector clockwise by the rotationAngle
